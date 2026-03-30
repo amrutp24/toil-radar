@@ -9,16 +9,14 @@ description = "Detect, visualize, and reduce DevOps toil"
 authors = [
     {name = "Amrut Pagidipally", email = "amrut.pagidipally@gmail.com"},
 ]
-license-files = ["LICENSE"]
 readme = "README.md"
-requires-python = ">=3.8"
+requires-python = ">=3.9"
 keywords = ["devops", "sre", "toil", "automation", "cli", "productivity"]
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Developers",
     "Intended Audience :: System Administrators",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.8",
     "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
