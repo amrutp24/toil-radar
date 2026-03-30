@@ -3,7 +3,7 @@ requires = ["setuptools>=45", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "toil-tracker"
+name = "toiltracker"
 version = "0.1.0"
 description = "Detect, visualize, and reduce DevOps toil"
 authors = [
@@ -12,6 +12,7 @@ authors = [
 license = "MIT"
 readme = "README.md"
 requires-python = ">=3.8"
+keywords = ["devops", "sre", "toil", "automation", "cli", "productivity"]
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Developers",
