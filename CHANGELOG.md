@@ -26,7 +26,7 @@ All notable changes to Toil Tracker will be documented in this file.
 
 ### 📦 Installation
 ```bash
-pip install git+https://github.com/amrutp24/toil-tracker
+pip install toil-radar
 ```
 
 ## [Unreleased]

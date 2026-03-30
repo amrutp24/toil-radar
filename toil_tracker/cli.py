@@ -126,7 +126,7 @@ def show_summary(db_path="toil.db", days=30):
     conn.close()
     
     if not results:
-        print("No toil data found. Run 'toil-tracker scan' first.")
+        print("No toil data found. Run 'toil-radar scan' first.")
         return
         
     print(f"\nToil Summary (last {days} days):")
@@ -151,9 +151,9 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  toil-tracker scan /path/to/repo
-  toil-tracker scan . --days 60
-  toil-tracker summary
+  toil-radar scan /path/to/repo
+  toil-radar scan . --days 60
+  toil-radar summary
         """
     )
     

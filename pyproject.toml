@@ -40,7 +40,7 @@ Repository = "https://github.com/amrutp24/toil-tracker"
 Issues = "https://github.com/amrutp24/toil-tracker/issues"
 
 [project.scripts]
-toil-tracker = "toil_tracker.cli:main"
+toil-radar = "toil_tracker.cli:main"
 toil-dashboard = "toil_tracker.dashboard:main"
 
 [tool.setuptools_scm]

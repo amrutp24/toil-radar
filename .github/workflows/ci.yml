@@ -34,5 +34,5 @@ jobs:
         
     - name: Test CLI installation
       run: |
-        toil-tracker --help
-        toil-tracker scan --help
+        toil-radar --help
+        toil-radar scan --help

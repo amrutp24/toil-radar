@@ -12,14 +12,14 @@ pip install toil-radar
 
 ### Scan a repository for toil:
 ```bash
-toil-tracker scan /path/to/your/repo
-toil-tracker scan /path/to/repo --days 60
+toil-radar scan /path/to/your/repo
+toil-radar scan /path/to/repo --days 60
 ```
  
 ### View toil summary:
 ```bash
-toil-tracker summary
-toil-tracker summary --days 30
+toil-radar summary
+toil-radar summary --days 30
 ```
  
 ### Launch web dashboard:
@@ -84,8 +84,8 @@ manual_fix: 4 total
 ## 🛠️ Development Install
 
 ```bash
-git clone https://github.com/amrutp24/toil-tracker
-cd toil-tracker
+git clone https://github.com/amrutp24/toil-radar
+cd toil-radar
 pip install -e .
 ```
 
