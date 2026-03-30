@@ -10,7 +10,7 @@ setup(
     name="toil-tracker",
     version="0.1.0",
     author="Amrut Pagidipally",
-    author_email="amrutp24@github.com",
+    author_email="amrut.pagidipally@gmail.com",
     description="Detect, visualize, and reduce DevOps toil",
     long_description=long_description,
     long_description_content_type="text/markdown",

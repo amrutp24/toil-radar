@@ -25,4 +25,4 @@ Instances of abusive behavior may be reported to the project maintainers. We res
 
 ## Contact
 
-For questions about this code of conduct, please contact amrutp24@github.com
+For questions about this code of conduct, please contact amrut.pagidipally@gmail.com

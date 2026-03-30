@@ -7,7 +7,7 @@ name = "toil-tracker"
 version = "0.1.0"
 description = "Detect, visualize, and reduce DevOps toil"
 authors = [
-    {name = "Amrut Pagidipally", email = "amrutp24@github.com"},
+    {name = "Amrut Pagidipally", email = "amrut.pagidipally@gmail.com"},
 ]
 license = {text = "MIT"}
 readme = "README.md"
