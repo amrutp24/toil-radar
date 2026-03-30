@@ -3,7 +3,7 @@ requires = ["setuptools>=45", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "toiltracker"
+name = "toil-radar"
 version = "0.1.0"
 description = "Detect, visualize, and reduce DevOps toil"
 authors = [
