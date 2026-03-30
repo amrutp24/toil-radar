@@ -1,10 +1,10 @@
 [build-system]
-requires = ["setuptools>=45", "wheel"]
+requires = ["setuptools>=65", "setuptools-scm>=8", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "toil-radar"
-version = "0.1.0"
+dynamic = ["version"]
 description = "Detect, visualize, and reduce DevOps toil"
 authors = [
     {name = "Amrut Pagidipally", email = "amrut.pagidipally@gmail.com"},
@@ -16,7 +16,7 @@ keywords = ["devops", "sre", "toil", "automation", "cli", "productivity"]
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Developers",
-    "Intended Audience :: System Administrators", 
+    "Intended Audience :: System Administrators",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.8",
     "Programming Language :: Python :: 3.9",
@@ -26,7 +26,7 @@ classifiers = [
 ]
 dependencies = [
     "streamlit>=1.29.0",
-    "pandas>=2.0.0", 
+    "pandas>=2.0.0",
     "plotly>=5.0.0",
 ]
 
@@ -34,7 +34,6 @@ dependencies = [
 dev = [
     "pytest>=6.0",
     "pytest-cov>=2.0",
-    "tox>=3.0",
 ]
 
 [project.urls]
@@ -45,3 +44,9 @@ Issues = "https://github.com/amrutp24/toil-tracker/issues"
 [project.scripts]
 toil-tracker = "toil_tracker.cli:main"
 toil-dashboard = "toil_tracker.dashboard:main"
+
+[tool.setuptools_scm]
+# version is derived from git tags automatically
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
