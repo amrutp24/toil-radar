@@ -5,7 +5,7 @@
 ## 🚀 Quick Install
 
 ```bash
-pip install git+https://github.com/amrutp24/toil-tracker
+pip install toil-radar
 ```
 
 ## 📱 Usage
@@ -24,7 +24,7 @@ toil-tracker summary --days 30
  
 ### Launch web dashboard:
 ```bash
-toil-tracker dashboard
+toil-dashboard
 ```
  
 ## 🎯 What it Detects
