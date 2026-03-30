@@ -114,13 +114,13 @@ def scan_repo(repo_path, days=30, db_path="toil.db"):
 def show_summary(db_path="toil.db", days=30):
     """Show toil summary"""
     conn = sqlite3.connect(db_path)
-    cursor = conn.execute(f'''
+    cursor = conn.execute('''
         SELECT task_type, severity, COUNT(*) as count
-        FROM toil_events 
-        WHERE date >= date('now', '-{days} days')
+        FROM toil_events
+        WHERE date >= date('now', ? || ' days')
         GROUP BY task_type, severity
         ORDER BY count DESC
-    ''')
+    ''', (str(int(days)),))
     
     results = cursor.fetchall()
     conn.close()

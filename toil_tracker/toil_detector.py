@@ -106,11 +106,11 @@ class ToilDetector:
         conn = sqlite3.connect(self.db_path)
         cursor = conn.execute('''
             SELECT task_type, severity, COUNT(*) as count, date
-            FROM toil_events 
-            WHERE date >= date('now', '-{} days')
+            FROM toil_events
+            WHERE date >= date('now', ? || ' days')
             GROUP BY task_type, severity
             ORDER BY count DESC
-        '''.format(days_back))
+        ''', (f'-{int(days_back)}',))
         
         results = cursor.fetchall()
         conn.close()
