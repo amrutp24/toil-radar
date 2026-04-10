@@ -114,6 +114,17 @@ def scan_repo(repo_path, days=30, db_path="toil.db"):
 def show_summary(db_path="toil.db", days=30):
     """Show toil summary"""
     conn = sqlite3.connect(db_path)
+    conn.execute('''
+        CREATE TABLE IF NOT EXISTS toil_events (
+            id INTEGER PRIMARY KEY,
+            date TEXT,
+            repo_path TEXT,
+            task_type TEXT,
+            description TEXT,
+            severity TEXT,
+            timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
+        )
+    ''')
     cursor = conn.execute('''
         SELECT task_type, severity, COUNT(*) as count
         FROM toil_events
