@@ -43,6 +43,9 @@ Issues = "https://github.com/amrutp24/toil-radar/issues"
 toil-radar = "toil_radar.cli:main"
 toil-dashboard = "toil_radar.dashboard:main"
 
+[tool.setuptools.packages.find]
+include = ["toil_radar*"]
+
 [tool.setuptools_scm]
 # version is derived from git tags automatically
 
