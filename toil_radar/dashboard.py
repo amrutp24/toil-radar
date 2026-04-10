@@ -8,7 +8,7 @@ import sqlite3
 import pandas as pd
 import plotly.express as px
 from datetime import datetime, timedelta
-from toil_detector import ToilDetector
+from .toil_detector import ToilDetector
 
 def init_database():
     """Initialize database if not exists"""
