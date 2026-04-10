@@ -299,9 +299,11 @@ class TestToilDetector(unittest.TestCase):
         self.assertGreater(len(results), 0)
 
     def test_summary_groups_by_task_and_severity(self):
+        from datetime import date
+        today = date.today().isoformat()
         events = [
-            {"date": "2026-01-01", "repo_path": "/r", "task_type": "revert", "description": "a", "severity": "LOW"},
-            {"date": "2026-01-02", "repo_path": "/r", "task_type": "revert", "description": "b", "severity": "LOW"},
+            {"date": today, "repo_path": "/r", "task_type": "revert", "description": "a", "severity": "LOW"},
+            {"date": today, "repo_path": "/r", "task_type": "revert", "description": "b", "severity": "LOW"},
         ]
         self.detector.save_toil_events(events)
         results = self.detector.get_toil_summary()
