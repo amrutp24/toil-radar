@@ -1,0 +1,8 @@
+# Toil Tracker
+
+include README.md
+include LICENSE
+include requirements.txt
+recursive-include toil_tracker *.py
+recursive-exclude * __pycache__
+recursive-exclude * *.py[co]

@@ -33,12 +33,12 @@ def load_data(days_back=30):
     
     query = '''
         SELECT date, task_type, severity, description, repo_path
-        FROM toil_events 
-        WHERE date >= date('now', '-{} days')
+        FROM toil_events
+        WHERE date >= date('now', ? || ' days')
         ORDER BY date DESC
-    '''.format(days_back)
-    
-    df = pd.read_sql_query(query, conn)
+    '''
+
+    df = pd.read_sql_query(query, conn, params=(f'-{int(days_back)}',))
     conn.close()
     return df
 
