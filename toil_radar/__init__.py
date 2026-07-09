@@ -1,6 +1,4 @@
-"""
-Toil Radar - Detect, visualize, and reduce DevOps toil
-"""
+"""Toil Radar - Detect, quantify, and reduce SRE/DevOps toil."""
 
 from importlib.metadata import version, PackageNotFoundError
 
@@ -9,7 +7,9 @@ try:
 except PackageNotFoundError:
     __version__ = "unknown"
 
-from .toil_detector import ToilDetector
+from .git_signals import scan as scan_git
+from .github_signals import scan as scan_github
+from .report import summarize
 from .cli import main as cli_main
 
-__all__ = ["ToilDetector", "cli_main", "__version__"]
+__all__ = ["scan_git", "scan_github", "summarize", "cli_main", "__version__"]

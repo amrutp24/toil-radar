@@ -22,13 +22,14 @@ classifiers = [
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
 ]
-dependencies = [
+dependencies = []
+
+[project.optional-dependencies]
+dashboard = [
     "streamlit>=1.29.0",
     "pandas>=2.0.0",
     "plotly>=5.0.0",
 ]
-
-[project.optional-dependencies]
 dev = [
     "pytest>=6.0",
     "pytest-cov>=2.0",
