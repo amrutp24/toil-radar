@@ -48,7 +48,8 @@ class Commit:
 
     @property
     def authored_dt(self):
-        return datetime.fromisoformat(self.authored_at)
+        # fromisoformat() rejects a trailing 'Z' before Python 3.11
+        return datetime.fromisoformat(self.authored_at.replace("Z", "+00:00"))
 
 
 def read_commits(repo_path, days_back=30):
