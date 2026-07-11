@@ -1,65 +1,53 @@
-# Toil Radar
+# toil-radar
 
-📡 **Detect, quantify, and reduce SRE/DevOps toil** — from signals your team already produces.
+Estimates how much time a team loses to toil — reverts, hotfixes, flaky CI, manual button-pushing — from signals already sitting in git history and GitHub Actions. Point it at a repo and get back estimated hours, a trend, and a ranked list of what to automate first.
 
-Toil is manual, repetitive, automatable operational work. The SRE handbook says to keep it under 50% of engineering time — but almost nobody measures it. Toil Radar estimates it from **structural signals** in git history and GitHub Actions, not keyword guessing, and tells you what to automate first.
+The SRE handbook says to keep toil under 50% of engineering time. Almost nobody measures it, and grepping commit messages for "fix" doesn't work — it flags half of normal development. So toil-radar only counts events that don't happen unless someone was cleaning up a mess:
 
-## What it detects
-
-**From git history (works offline):**
-
-| Signal | What it means |
+| signal | what happened |
 |---|---|
-| `revert` | Reverts and rollbacks — bad changes reached mainline |
-| `hotfix_merge` | Merges from hotfix/emergency branches |
-| `quick_fix` | Same author re-touching the same file within 2 hours *with a corrective message* — fix-the-fix churn, not normal iteration |
+| `revert` | a revert or rollback commit |
+| `hotfix_merge` | a merge from a hotfix or emergency branch |
+| `quick_fix` | the same author patched the same file again within 2 hours, with a corrective message |
+| `ci_rerun` | a workflow run needed more than one attempt |
+| `manual_dispatch` | someone triggered a workflow by hand |
 
-Out-of-hours work (nights/weekends) doesn't create noise as its own signal — it **amplifies** the weight of real events, because a Saturday-night rollback costs more than a Tuesday-morning one.
+The git signals work offline. The two GitHub Actions signals use the `gh` CLI if it's installed and authenticated, and are skipped quietly if not.
 
-**From GitHub Actions (via `gh`, optional):**
-
-| Signal | What it means |
-|---|---|
-| `ci_rerun` | Workflow runs with `run_attempt > 1` — someone babysat flaky CI |
-| `manual_dispatch` | `workflow_dispatch` runs — someone pushed a button that could be automated |
-
-Every event gets an estimated cost in minutes. Rescans never double-count — events are deduplicated by commit hash / run id.
+Every event gets a rough cost in minutes (weights are in [`toil_radar/git_signals.py`](toil_radar/git_signals.py), deliberately conservative), counted 1.5x if it happened on a night or weekend. The total isn't meant to be payroll-accurate — it's a consistent number you can trend over time and use to decide what to automate first. Rescanning never double-counts: events are deduplicated by commit hash or run id.
 
 ## Install
 
 ```bash
-pip install toil-radar               # CLI only, zero dependencies
-pip install "toil-radar[dashboard]"  # + Streamlit dashboard
+pip install toil-radar               # CLI, no dependencies
+pip install "toil-radar[dashboard]"  # adds the Streamlit dashboard
 ```
 
 ## Usage
 
 ```bash
-# Scan a repository (add --no-github to skip the gh API)
-toil-radar scan /path/to/repo
+toil-radar scan /path/to/repo        # add --no-github to skip the gh API
 toil-radar scan . --days 60
-
-# Report: estimated hours, trend, hotspots, automation candidates
 toil-radar summary
 toil-radar summary --repo /path/to/repo --days 90
-
-# Web dashboard
 toil-dashboard
 ```
 
-You can scan multiple repos into the same database — `summary` aggregates across all of them, or filter with `--repo`.
+Scans from multiple repos accumulate in one database; `summary` aggregates across all of them unless you filter with `--repo`.
 
-## Example output
+## Example
+
+Real output from scanning this repo:
 
 ```
 Toil Radar - last 120 days - all repos
 ============================================================
-Estimated toil: 6.2h (~1% of one engineer's time)   trend vs prior 120d: up 24%
-Out-of-hours events: 13 (nights/weekends)
+Estimated toil: 3.5h (~1% of one engineer's time)
+Out-of-hours events: 7 (nights/weekends)
 
 signal                        events  est. hours
 ------------------------------------------------
-rapid follow-up fixes             17         5.9
+rapid follow-up fixes              9         3.1
 CI re-runs                         1         0.3
 
 Churn hotspots (same file touched in many commits):
@@ -67,7 +55,7 @@ Churn hotspots (same file touched in many commits):
   setup.py  (4 commits)
 
 Top automation candidates:
-1. rapid follow-up fixes: 17 events, ~5.9h
+1. rapid follow-up fixes: 9 events, ~3.1h
    Fix-the-fix churn means feedback arrives too late - add the missing
    linter, type check, or test that would catch these pre-push.
    e.g. "fix: explicitly include only toil_radar package in build" (2026-04-09)
@@ -77,15 +65,7 @@ Top automation candidates:
    e.g. "Publish to PyPI re-run (attempt 3)" (2026-03-30)
 ```
 
-(That's real output from scanning this repo. The packaging churn was, in fact, toil.)
-
-## Why structural signals instead of keywords?
-
-Grepping commit messages for "fix" or "deploy" flags most normal development work and makes the numbers meaningless. Structural signals — an actual `Revert "..."` commit, a merge from a `hotfix/*` branch, the same file patched twice in 30 minutes, a CI run re-attempted three times — are things that *only* happen when somebody was doing operational cleanup. Low noise, defensible numbers.
-
-## How the cost estimate works
-
-Each signal type has a conservative per-event weight (revert 45 min, hotfix merge 60 min, quick fix 15 min, CI re-run 10 min per extra attempt, manual dispatch 10 min), multiplied ×1.5 out of hours. See `WEIGHTS` in [`toil_radar/git_signals.py`](toil_radar/git_signals.py). The point isn't per-minute accuracy — it's a consistent metric you can trend over time and use to rank what to automate first.
+The verdict on our own history was fair: the packaging churn in April really was toil, and that PyPI publish really did take three attempts.
 
 ## Development
 
@@ -98,10 +78,10 @@ pytest
 
 ## Roadmap
 
-- PagerDuty / Opsgenie ingestion (repeated alerts = the strongest toil signal)
-- Deploy→fix→deploy loop detection
-- Per-team / per-author views
-- Export to Prometheus metrics for long-term trending
+- PagerDuty / Opsgenie ingestion — repeated alerts are the strongest toil signal there is
+- deploy→fix→deploy loop detection
+- per-team and per-author views
+- Prometheus metrics export for long-term trending
 
 ## License
 
