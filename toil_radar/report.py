@@ -15,6 +15,12 @@ RECOMMENDATIONS = {
                 "quarantine the flakiest jobs and fix them; every re-run is babysitting.",
     "manual_dispatch": "Manually triggered workflows are standing automation "
                        "candidates - wire them to events, schedules, or merges.",
+    "broken_main": "Breakage is landing on the default branch and being fixed "
+                   "forward under pressure - gate merges on the checks that "
+                   "failed, so the build breaks in a PR instead of on main.",
+    "page": "Pages are the most expensive toil there is - someone dropped "
+            "everything. Tune or delete the alerts that don't need a human, "
+            "and automate the runbook for the ones that do.",
 }
 
 SIGNAL_LABELS = {
@@ -23,6 +29,8 @@ SIGNAL_LABELS = {
     "quick_fix": "rapid follow-up fixes",
     "ci_rerun": "CI re-runs",
     "manual_dispatch": "manual workflow triggers",
+    "broken_main": "broken default branch",
+    "page": "incident pages",
 }
 
 
