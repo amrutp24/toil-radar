@@ -54,7 +54,11 @@ def save_commits(conn, repo, commits):
 
 
 def save_events(conn, repo, events):
-    """Insert events, skipping ones already recorded. Returns number of new rows."""
+    """Insert events, skipping ones already recorded. Returns number of new rows.
+
+    An event may carry its own "repo" key (incident sources use the service
+    name), which overrides the repo argument.
+    """
     new = 0
     for e in events:
         cur = conn.execute(
@@ -62,7 +66,7 @@ def save_events(conn, repo, events):
             " (repo, signal, ref, date, author, description, out_of_hours, minutes, detail)"
             " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (
-                repo,
+                e.get("repo") or repo,
                 e["signal"],
                 e["ref"],
                 e["date"],
@@ -87,7 +91,7 @@ def _window(days):
 def events_in_window(conn, days, repo=None):
     start, end = _window(days)
     sql = (
-        "SELECT repo, signal, ref, date, author, description, out_of_hours, minutes"
+        "SELECT repo, signal, ref, date, author, description, out_of_hours, minutes, detail"
         " FROM toil_events WHERE date >= ? AND date < ?"
     )
     params = [start, end]
@@ -95,8 +99,11 @@ def events_in_window(conn, days, repo=None):
         sql += " AND repo = ?"
         params.append(repo)
     sql += " ORDER BY date DESC"
-    cols = ["repo", "signal", "ref", "date", "author", "description", "out_of_hours", "minutes"]
-    return [dict(zip(cols, row)) for row in conn.execute(sql, params).fetchall()]
+    cols = ["repo", "signal", "ref", "date", "author", "description", "out_of_hours", "minutes", "detail"]
+    events = [dict(zip(cols, row)) for row in conn.execute(sql, params).fetchall()]
+    for e in events:
+        e["detail"] = json.loads(e["detail"] or "{}")
+    return events
 
 
 def minutes_in_prior_window(conn, days, repo=None):

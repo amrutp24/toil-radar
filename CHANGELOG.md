@@ -2,6 +2,29 @@
 
 All notable changes to Toil Radar will be documented in this file.
 
+## [Unreleased]
+
+### Added
+- New `broken_main` signal: the default branch going red and being fixed forward.
+  Consecutive failed runs of one workflow collapse into a single episode ending
+  at the next green run, costed by how long the branch stayed red (floored at
+  10 minutes, capped at 2 hours) and amplified x1.5 out of hours. An episode
+  that hasn't recovered yet isn't counted until it does
+- `scan` now resolves the repo's default branch via `gh`; if that lookup fails
+  the other GitHub signals still work
+
+### Experimental
+- Groundwork for incident ingestion (`toil_radar/pagerduty_signals.py` and a
+  `toil-radar pages` command) that turns PagerDuty incidents into `page` events
+  costed on actual time-to-resolve. It is deliberately absent from the README:
+  it has never run against a live PagerDuty account, only against JSON exports
+  and a local mock, so treat it as unvalidated until someone with access
+  confirms the payload assumptions hold.
+
+### Fixed
+- Event `detail` is stored and read back as structured data rather than being
+  discarded on read
+
 ## [0.2.0] - 2026-07-08
 
 ### Changed (breaking)
@@ -48,11 +71,3 @@ All notable changes to Toil Radar will be documented in this file.
 ```bash
 pip install toil-radar
 ```
-
-## [Unreleased]
-
-### 🚀 Planned Features
-- Integration with CI/CD platforms
-- More detection patterns
-- Enhanced visualizations
-- API for integrations
