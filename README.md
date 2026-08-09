@@ -89,7 +89,7 @@ pytest
 
 ## Roadmap
 
-- incident ingestion (PagerDuty, Opsgenie) — repeated alerts are the strongest toil signal there is. There's unadvertised groundwork for this in `toil_radar/pagerduty_signals.py`, but nobody here has an account to validate it against, so it stays off the feature list until someone does
+- incident ingestion (PagerDuty, Opsgenie) — repeated alerts are the strongest toil signal there is
 - deploy→fix→deploy loop detection
 - per-team and per-author views
 - Prometheus metrics export for long-term trending

@@ -18,7 +18,7 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 from toil_radar import git_signals, github_signals, pagerduty_signals, report, store
-from toil_radar.cli import ingest_pages, scan_repo, show_summary
+from toil_radar.cli import ingest_pages, main as cli_main, scan_repo, show_summary
 
 
 # --- helpers ---------------------------------------------------------------
@@ -732,6 +732,15 @@ def test_pages_ingest_stores_under_service_and_dedups(tmp_path, db, capsys):
     rows = conn.execute("SELECT repo, signal FROM toil_events ORDER BY repo").fetchall()
     conn.close()
     assert rows == [("checkout-api", "page"), ("payments", "page")]
+
+
+def test_pages_is_not_advertised_in_help(capsys, monkeypatch):
+    # the command works but isn't validated, so it must not appear in --help
+    monkeypatch.setattr(sys, "argv", ["toil-radar"])
+    assert cli_main() == 0
+    help_text = capsys.readouterr().out
+    assert "pages" not in help_text
+    assert "scan" in help_text and "summary" in help_text
 
 
 def test_pages_ingest_reports_failure(db, tmp_path, capsys):
