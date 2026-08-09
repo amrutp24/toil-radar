@@ -2,7 +2,7 @@
 
 All notable changes to Toil Radar will be documented in this file.
 
-## [Unreleased]
+## [0.3.0] - 2026-08-09
 
 ### Added
 - New `broken_main` signal: the default branch going red and being fixed forward.
