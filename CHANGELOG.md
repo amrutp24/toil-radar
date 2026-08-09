@@ -13,14 +13,6 @@ All notable changes to Toil Radar will be documented in this file.
 - `scan` now resolves the repo's default branch via `gh`; if that lookup fails
   the other GitHub signals still work
 
-### Experimental
-- Groundwork for incident ingestion (`toil_radar/pagerduty_signals.py` and a
-  `toil-radar pages` command) that turns PagerDuty incidents into `page` events
-  costed on actual time-to-resolve. It is deliberately absent from the README:
-  it has never run against a live PagerDuty account, only against JSON exports
-  and a local mock, so treat it as unvalidated until someone with access
-  confirms the payload assumptions hold.
-
 ### Fixed
 - `ci_rerun` and `manual_dispatch` hardcoded `out_of_hours: False`, so a 3am
   re-run was weighted the same as a Tuesday-afternoon one. Both now use the
