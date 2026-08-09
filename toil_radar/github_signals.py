@@ -146,7 +146,12 @@ def scan(repo_path, days_back=30):
             continue
         run = json.loads(line)
         runs.append(run)
-        date = run["created_at"][:10]
+        # Local time, like every other signal: a 3am re-run is someone's night,
+        # and the UTC calendar date can land on the wrong day either way.
+        started = _parse_dt(run["created_at"]).astimezone()
+        date = started.date().isoformat()
+        ooh = is_out_of_hours(started)
+        amplifier = OUT_OF_HOURS_MULTIPLIER if ooh else 1
         if run.get("run_attempt", 1) > 1:
             extra_attempts = run["run_attempt"] - 1
             events.append({
@@ -155,8 +160,8 @@ def scan(repo_path, days_back=30):
                 "date": date,
                 "author": None,
                 "description": f"{run['name']} re-run (attempt {run['run_attempt']})",
-                "out_of_hours": False,
-                "minutes": WEIGHTS["ci_rerun"] * extra_attempts,
+                "out_of_hours": ooh,
+                "minutes": WEIGHTS["ci_rerun"] * extra_attempts * amplifier,
                 "detail": {"attempts": run["run_attempt"], "conclusion": run.get("conclusion")},
             })
         if run.get("event") == "workflow_dispatch":
@@ -166,8 +171,8 @@ def scan(repo_path, days_back=30):
                 "date": date,
                 "author": None,
                 "description": f"{run['name']} triggered manually",
-                "out_of_hours": False,
-                "minutes": WEIGHTS["manual_dispatch"],
+                "out_of_hours": ooh,
+                "minutes": WEIGHTS["manual_dispatch"] * amplifier,
                 "detail": {"conclusion": run.get("conclusion")},
             })
 

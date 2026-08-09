@@ -235,14 +235,13 @@ def gh_run(run_id, name="CI", conclusion="success", branch="main",
 
 
 def test_github_rerun_and_dispatch_events():
-    runs = [
-        json.dumps({"id": 1, "name": "e2e", "event": "push", "run_attempt": 3,
-                    "conclusion": "success", "created_at": "2026-07-01T10:00:00Z"}),
-        json.dumps({"id": 2, "name": "deploy", "event": "workflow_dispatch", "run_attempt": 1,
-                    "conclusion": "success", "created_at": "2026-07-02T10:00:00Z"}),
-        json.dumps({"id": 3, "name": "ci", "event": "push", "run_attempt": 1,
-                    "conclusion": "success", "created_at": "2026-07-03T10:00:00Z"}),
-    ]
+    # local timestamps, so the assertions don't depend on the runner's timezone
+    t = weekday_working_hours(days_ago=2)
+    runs = [json.dumps(r) for r in [
+        gh_run(1, name="e2e", attempt=3, local_time=t),
+        gh_run(2, name="deploy", event="workflow_dispatch", local_time=t + timedelta(hours=1)),
+        gh_run(3, name="ci", local_time=t + timedelta(hours=2)),
+    ]]
     with patch("toil_radar.github_signals.subprocess.run",
                side_effect=[_gh_result(runs), _gh_result(["main"])]):
         events, reason = github_signals.scan(".", days_back=30)
@@ -250,7 +249,37 @@ def test_github_rerun_and_dispatch_events():
     signals = sorted(e["signal"] for e in events)
     assert signals == ["ci_rerun", "manual_dispatch"]
     rerun = next(e for e in events if e["signal"] == "ci_rerun")
+    assert rerun["out_of_hours"] is False
     assert rerun["minutes"] == git_signals.WEIGHTS["ci_rerun"] * 2  # 2 extra attempts
+    assert rerun["date"] == t.date().isoformat()
+
+
+def test_out_of_hours_amplifies_rerun_and_dispatch():
+    t = recent_weekend_night()
+    runs = [json.dumps(r) for r in [
+        gh_run(1, name="e2e", attempt=2, local_time=t),
+        gh_run(2, name="deploy", event="workflow_dispatch", local_time=t + timedelta(minutes=5)),
+    ]]
+    with patch("toil_radar.github_signals.subprocess.run",
+               side_effect=[_gh_result(runs), _gh_result(["main"])]):
+        events, reason = github_signals.scan(".", days_back=30)
+    assert reason is None
+    by_signal = {e["signal"]: e for e in events}
+    assert all(e["out_of_hours"] is True for e in events)
+    assert by_signal["ci_rerun"]["minutes"] == \
+        git_signals.WEIGHTS["ci_rerun"] * git_signals.OUT_OF_HOURS_MULTIPLIER
+    assert by_signal["manual_dispatch"]["minutes"] == \
+        git_signals.WEIGHTS["manual_dispatch"] * git_signals.OUT_OF_HOURS_MULTIPLIER
+
+
+def test_run_date_uses_local_time_not_utc():
+    # a run late on a local evening must not be filed under the next UTC day
+    local = recent_weekend_night(hour=23)
+    runs = [json.dumps(gh_run(1, attempt=2, local_time=local))]
+    with patch("toil_radar.github_signals.subprocess.run",
+               side_effect=[_gh_result(runs), _gh_result(["main"])]):
+        events, _ = github_signals.scan(".", days_back=30)
+    assert events[0]["date"] == local.date().isoformat()
 
 
 def test_github_missing_gh_degrades_gracefully():

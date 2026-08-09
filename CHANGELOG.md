@@ -22,6 +22,13 @@ All notable changes to Toil Radar will be documented in this file.
   confirms the payload assumptions hold.
 
 ### Fixed
+- `ci_rerun` and `manual_dispatch` hardcoded `out_of_hours: False`, so a 3am
+  re-run was weighted the same as a Tuesday-afternoon one. Both now use the
+  x1.5 multiplier like every other signal, which raises reported toil for teams
+  whose CI babysitting happens at night
+- Those two signals also dated events by the UTC calendar day, putting a late
+  local evening on the following day. They now use local time, matching the git
+  signals and `broken_main`
 - Event `detail` is stored and read back as structured data rather than being
   discarded on read
 
