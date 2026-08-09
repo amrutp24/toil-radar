@@ -92,7 +92,9 @@ Examples:
   toil-radar summary --repo /path/to/repo --days 90
         """,
     )
-    subparsers = parser.add_subparsers(dest="command", help="Available commands")
+    subparsers = parser.add_subparsers(
+        dest="command", metavar="{scan,summary}", help="Available commands"
+    )
 
     scan_parser = subparsers.add_parser("scan", help="Scan a repository for toil signals")
     scan_parser.add_argument("repo_path", help="Path to Git repository")
@@ -100,13 +102,18 @@ Examples:
     scan_parser.add_argument("--db", default=store.DEFAULT_DB, help=f"Database file (default: {store.DEFAULT_DB})")
     scan_parser.add_argument("--no-github", action="store_true", help="Skip GitHub Actions signals")
 
+    # Hidden until it has run against a live PagerDuty account. The code works
+    # against JSON exports and a mock, but an undocumented command in --help is
+    # still a promise, so it stays out of the listing until we can back it up.
+    # argparse.SUPPRESS doesn't work on subparsers - it prints the literal
+    # string. Omitting help= keeps it out of the listing; the metavar above
+    # keeps it out of the usage line.
     pages_parser = subparsers.add_parser(
         "pages",
-        help="(experimental) Ingest PagerDuty incidents as toil events",
-        description="Experimental, and unvalidated against a live PagerDuty "
-                    "account - see the roadmap note in the README. Reads the API "
-                    "token from the PAGERDUTY_TOKEN environment variable; use "
-                    "--file to load a JSON export instead.",
+        description="Unvalidated against a live PagerDuty account, and not a "
+                    "supported feature yet. Reads the API token from the "
+                    "PAGERDUTY_TOKEN environment variable; use --file to load a "
+                    "JSON export instead.",
     )
     pages_parser.add_argument("--days", type=int, default=30, help="Days to look back (default: 30)")
     pages_parser.add_argument("--db", default=store.DEFAULT_DB, help=f"Database file (default: {store.DEFAULT_DB})")
