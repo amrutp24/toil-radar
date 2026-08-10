@@ -17,6 +17,8 @@ The git signals work offline. The three GitHub Actions signals use the `gh` CLI 
 
 `broken_main` counts episodes, not failures. Consecutive failed runs of one workflow on the default branch collapse into a single event that ends at the next green run — three failed pushes in ten minutes is one person fixing one mistake, not three incidents. It's costed by how long the branch stayed red (floored at 10 minutes, capped at 2 hours), and an episode still red at scan time isn't counted until it recovers.
 
+Each episode also records the commit its first failing run was built from, so `summary` can name what actually broke the branch rather than everything that happened to land nearby. Commits older than the scanned history just don't contribute.
+
 Every other event gets a rough cost in minutes (weights are in [`toil_radar/git_signals.py`](toil_radar/git_signals.py), deliberately conservative). Anything that started on a night or weekend counts 1.5x. The total isn't meant to be payroll-accurate — it's a consistent number you can trend over time and use to decide what to automate first. Rescanning never double-counts: events are deduplicated by commit hash or run id.
 
 ## Install
@@ -31,12 +33,13 @@ pip install "toil-radar[dashboard]"  # adds the Streamlit dashboard
 ```bash
 toil-radar scan /path/to/repo        # add --no-github to skip the gh API
 toil-radar scan . --days 60
+toil-radar scan ~/code/*             # several at once
 toil-radar summary
 toil-radar summary --repo /path/to/repo --days 90
 toil-dashboard
 ```
 
-Scans from multiple repos accumulate in one database; `summary` aggregates across all of them unless you filter with `--repo`.
+Scans accumulate in one database; `summary` aggregates across every repo you've scanned unless you filter with `--repo`. `scan` takes any number of paths, and a bad one doesn't abort the rest — anything in the list that isn't a git repo is reported and skipped, so globbing a directory of projects does the sensible thing. The exit code is non-zero if any path failed.
 
 ## Example
 
@@ -45,27 +48,32 @@ Real output from scanning this repo:
 ```
 Toil Radar - last 180 days - all repos
 ============================================================
-Estimated toil: 6.1h (~1% of one engineer's time)
-Out-of-hours events: 12 (nights/weekends)
+Estimated toil: 4.6h (~0% of one engineer's time)
+Out-of-hours events: 9 (nights/weekends)
 
 signal                        events  est. hours
 ------------------------------------------------
-rapid follow-up fixes             12         4.1
-broken default branch              4         1.6
+rapid follow-up fixes             10         3.4
+broken default branch              3         0.9
 CI re-runs                         1         0.3
 
 Churn hotspots (same file touched in many commits):
-  pyproject.toml  (12 commits)
-  README.md  (7 commits)
-  tests/test_basic.py  (7 commits)
-  setup.py  (5 commits)
+  pyproject.toml  (11 commits)
+  tests/test_basic.py  (8 commits)
+  README.md  (6 commits)
+  CHANGELOG.md  (6 commits)
+
+What broke the default branch:
+  tests/test_basic.py  (2 of 3 episodes)
+  toil_radar/store.py  (1 of 3 episodes)
+  toil_radar/__init__.py  (1 of 3 episodes)
 
 Top automation candidates:
-1. rapid follow-up fixes: 12 events, ~4.1h
+1. rapid follow-up fixes: 10 events, ~3.4h
    Fix-the-fix churn means feedback arrives too late - add the missing
    linter, type check, or test that would catch these pre-push.
    e.g. "Fix author date parsing on Python < 3.11 (trailing Z)" (2026-07-09)
-2. broken default branch: 4 events, ~1.6h
+2. broken default branch: 3 events, ~0.9h
    Breakage is landing on the default branch and being fixed forward under
    pressure - gate merges on the checks that failed, so the build breaks in
    a PR instead of on main.
@@ -76,7 +84,7 @@ Top automation candidates:
    e.g. "Publish to PyPI re-run (attempt 3)" (2026-03-30)
 ```
 
-The verdict on our own history was fair. The packaging churn in April really was toil, that PyPI publish really did take three attempts, and all four red-main episodes were real — twelve failed runs on `main` that resolved into four separate scrambles, three of them after hours.
+The verdict on our own history was fair. The packaging churn really was toil, that PyPI publish really did take three attempts, and the red-main episodes were real scrambles rather than noise. The attribution earns its keep too: it fingers `tests/test_basic.py` in two of the three, and the July episode traces to the detection-engine rewrite, fixed twenty minutes later by a commit whose message is "Fix author date parsing on Python < 3.11".
 
 ## Development
 
