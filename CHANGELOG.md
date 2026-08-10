@@ -2,7 +2,7 @@
 
 All notable changes to Toil Radar will be documented in this file.
 
-## [Unreleased]
+## [0.4.0] - 2026-08-10
 
 ### Added
 - `scan` takes any number of repository paths, so `toil-radar scan ~/code/*`
