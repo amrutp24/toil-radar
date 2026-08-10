@@ -52,17 +52,36 @@ class Commit:
         return datetime.fromisoformat(self.authored_at.replace("Z", "+00:00"))
 
 
+def _has_commits(repo_path):
+    """False for a repo that's been init'd but never committed to."""
+    result = subprocess.run(
+        ["git", "-C", str(repo_path), "rev-parse", "--verify", "--quiet", "HEAD"],
+        capture_output=True, text=True, encoding="utf-8", errors="replace",
+    )
+    return result.returncode == 0
+
+
 def read_commits(repo_path, days_back=30):
     """Read commits from the last `days_back` days, oldest first."""
+    repo_path = Path(repo_path).resolve()
     fmt = f"{_RS}%H{_US}%P{_US}%an{_US}%aI{_US}%s"
     result = subprocess.run(
         [
-            "git", "-C", str(Path(repo_path).resolve()), "log",
+            "git", "-C", str(repo_path), "log",
             f"--since={days_back} days ago",
             f"--pretty=format:{fmt}", "--name-only",
         ],
-        capture_output=True, text=True, encoding="utf-8", errors="replace", check=True,
+        capture_output=True, text=True, encoding="utf-8", errors="replace",
     )
+    if result.returncode != 0:
+        # An empty repo isn't worth failing a multi-repo scan over. Checking
+        # HEAD rather than matching git's wording keeps this locale-independent,
+        # and it only runs on the failure path.
+        if not _has_commits(repo_path):
+            return []
+        raise subprocess.CalledProcessError(
+            result.returncode, result.args, result.stdout, result.stderr
+        )
     commits = []
     for record in result.stdout.split(_RS):
         if not record.strip():

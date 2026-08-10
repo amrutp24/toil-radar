@@ -18,7 +18,9 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 from toil_radar import git_signals, github_signals, pagerduty_signals, report, store
-from toil_radar.cli import ingest_pages, main as cli_main, scan_repo, show_summary
+from toil_radar.cli import (
+    ingest_pages, main as cli_main, scan_repo, scan_repos, show_summary,
+)
 
 
 # --- helpers ---------------------------------------------------------------
@@ -231,6 +233,7 @@ def gh_run(run_id, name="CI", conclusion="success", branch="main",
         "conclusion": conclusion,
         "created_at": local_time.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
         "head_branch": branch,
+        "head_sha": "sha%d" % run_id,
     }
 
 
@@ -309,6 +312,18 @@ def test_broken_main_groups_consecutive_failures_into_one_episode():
     assert events[0]["detail"]["recovered_by"] == "4"
     assert events[0]["minutes"] == 14                   # inside the clamps
     assert "3 failed runs" in events[0]["description"]
+
+
+def test_broken_main_records_the_commits_either_side():
+    t = weekday_working_hours(days_ago=2)
+    runs = [
+        gh_run(1, conclusion="failure", local_time=t),
+        gh_run(2, conclusion="failure", local_time=t + timedelta(minutes=5)),
+        gh_run(3, conclusion="success", local_time=t + timedelta(minutes=20)),
+    ]
+    detail = github_signals.detect_broken_main(runs, "main")[0]["detail"]
+    assert detail["broken_by"] == "sha1"   # the first failing run's commit
+    assert detail["fixed_by"] == "sha3"
 
 
 def test_green_default_branch_produces_nothing():
@@ -464,6 +479,45 @@ def test_scan_stores_commits_for_hotspots(repo, db):
     assert hotspots[0][1] == 5
 
 
+def test_empty_repo_scans_cleanly(tmp_path, db):
+    # git init with no commits: common when globbing a directory of repos
+    make_git_repo(tmp_path)
+    _, events = git_signals.scan(tmp_path, days_back=30)
+    assert events == []
+    assert scan_repo(str(tmp_path), days=30, db_path=db, github=False) == 0
+
+
+def test_scan_several_repos_into_one_database(tmp_path, db):
+    first, second = tmp_path / "one", tmp_path / "two"
+    for path, message in ((first, "rollback bad release"), (second, "Revert \"a change\"")):
+        path.mkdir()
+        make_git_repo(path)
+        make_commit(path, "a.py", message, when=weekday_working_hours())
+
+    assert scan_repos([str(first), str(second)], days=30, db_path=db, github=False) == 0
+
+    conn = store.connect(db)
+    scanned = store.repos(conn)
+    conn.close()
+    assert sorted(scanned) == sorted([str(first.resolve()), str(second.resolve())])
+
+
+def test_one_bad_path_does_not_stop_the_others(tmp_path, db, capsys):
+    good = tmp_path / "good"
+    good.mkdir()
+    make_git_repo(good)
+    make_commit(good, "a.py", "rollback bad release", when=weekday_working_hours())
+
+    rc = scan_repos([str(tmp_path / "missing"), str(good)], days=30, db_path=db, github=False)
+    assert rc == 1                       # the failure is reported
+    assert "1 of 2 repositories scanned" in capsys.readouterr().out
+
+    conn = store.connect(db)             # but the good one still landed
+    count = conn.execute("SELECT COUNT(*) FROM toil_events").fetchone()[0]
+    conn.close()
+    assert count == 1
+
+
 def test_scan_invalid_path_returns_error(db):
     assert scan_repo("/nonexistent/path", days=30, db_path=db) == 1
 
@@ -501,6 +555,58 @@ def test_summary_math(db):
     assert summary["total_minutes"] == 65
     assert summary["by_signal"]["revert"]["count"] == 1
     assert summary["candidates"][0]["signal"] == "revert"  # ranked by minutes
+
+
+def _store_breakage(conn, repo_key, sha, ref="1"):
+    store.save_events(conn, repo_key, [{
+        "signal": "broken_main", "ref": ref,
+        "date": datetime.now().date().isoformat(), "minutes": 20,
+        "detail": {"workflow": "CI", "branch": "main", "broken_by": sha},
+    }])
+
+
+def test_report_names_the_files_that_broke_the_branch(repo, db):
+    make_commit(repo, "deploy.yaml", "add deploy config", when=weekday_working_hours(days_ago=2))
+    scan_repo(str(repo), days=30, db_path=db, github=False)
+
+    conn = store.connect(db)
+    repo_key = str(Path(repo).resolve())
+    sha = conn.execute("SELECT hash FROM commits WHERE repo = ?", (repo_key,)).fetchone()[0]
+    _store_breakage(conn, repo_key, sha)
+    summary = report.summarize(conn, days=30)
+    conn.close()
+
+    assert summary["breakage"]["episodes"] == 1
+    assert ("deploy.yaml", 1) in summary["breakage"]["files"]
+    assert "What broke the default branch" in report.render_text(summary)
+
+
+def test_breakage_attribution_skips_commits_we_never_scanned(repo, db):
+    # the culprit predates the window, so it contributes nothing rather than guessing
+    make_commit(repo, "a.py", "unrelated", when=weekday_working_hours(days_ago=2))
+    scan_repo(str(repo), days=30, db_path=db, github=False)
+
+    conn = store.connect(db)
+    _store_breakage(conn, str(Path(repo).resolve()), "a-sha-we-never-stored")
+    summary = report.summarize(conn, days=30)
+    conn.close()
+
+    assert summary["breakage"]["episodes"] == 1
+    assert summary["breakage"]["files"] == []
+    assert "What broke the default branch" not in report.render_text(summary)
+
+
+def test_files_for_commits_is_scoped_to_its_repo(repo, db):
+    make_commit(repo, "a.py", "add a", when=weekday_working_hours(days_ago=2))
+    scan_repo(str(repo), days=30, db_path=db, github=False)
+
+    conn = store.connect(db)
+    repo_key = str(Path(repo).resolve())
+    sha = conn.execute("SELECT hash FROM commits WHERE repo = ?", (repo_key,)).fetchone()[0]
+    assert store.files_for_commits(conn, repo_key, [sha]) == {sha: ["a.py"]}
+    assert store.files_for_commits(conn, "/some/other/repo", [sha]) == {}
+    assert store.files_for_commits(conn, repo_key, []) == {}
+    conn.close()
 
 
 def test_trend_vs_prior_period(db):

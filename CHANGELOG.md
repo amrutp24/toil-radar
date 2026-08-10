@@ -2,7 +2,21 @@
 
 All notable changes to Toil Radar will be documented in this file.
 
-## [0.3.0] - 2026-08-09
+## [Unreleased]
+
+### Added
+- `scan` takes any number of repository paths, so `toil-radar scan ~/code/*`
+  works. A path that isn't a git repo is reported and skipped rather than
+  aborting the run; the exit code is non-zero if any path failed
+- `broken_main` episodes record the commit their first failing run was built
+  from, and `summary` uses that to report which files keep breaking the default
+  branch. Commits outside the scanned history don't contribute rather than being
+  guessed at from a time window
+
+### Fixed
+- A repository with no commits yet no longer fails the scan with a raw `git log`
+  error - it reports zero commits and moves on, which matters now that one
+  invocation can cover a whole directory of repos
 
 ### Added
 - New `broken_main` signal: the default branch going red and being fixed forward.

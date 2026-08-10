@@ -133,5 +133,18 @@ def file_hotspots(conn, days, repo=None, min_commits=4, top=5):
     return [(f, n) for f, n in counts.most_common(top) if n >= min_commits]
 
 
+def files_for_commits(conn, repo, hashes):
+    """Map commit hash -> files touched, for hashes we happen to have stored."""
+    hashes = list(hashes)
+    if not hashes:
+        return {}
+    placeholders = ",".join("?" * len(hashes))
+    rows = conn.execute(
+        "SELECT hash, files FROM commits WHERE repo = ? AND hash IN (%s)" % placeholders,
+        [repo] + hashes,
+    ).fetchall()
+    return {h: json.loads(files or "[]") for h, files in rows}
+
+
 def repos(conn):
     return [r[0] for r in conn.execute("SELECT DISTINCT repo FROM toil_events ORDER BY repo")]

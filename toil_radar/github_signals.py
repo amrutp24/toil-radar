@@ -111,6 +111,10 @@ def _broken_main_event(name, branch, episode, recovery):
             "failed_runs": failures,
             "red_minutes": round(red_minutes, 1),
             "recovered_by": str(recovery["id"]),
+            # The run API hands us the exact commit each run was built from, so
+            # the culprit doesn't have to be guessed from a time window.
+            "broken_by": first.get("head_sha"),
+            "fixed_by": recovery.get("head_sha"),
         },
     }
 
@@ -125,7 +129,7 @@ def scan(repo_path, days_back=30):
                 "gh", "api", f"repos/{{owner}}/{{repo}}/actions/runs?created=>={since}",
                 "--paginate",
                 "--jq", ".workflow_runs[] | {id, name, event, run_attempt, conclusion,"
-                        " created_at, head_branch}",
+                        " created_at, head_branch, head_sha}",
             ],
             cwd=repo_path, capture_output=True, text=True,
             encoding="utf-8", errors="replace", timeout=120,
