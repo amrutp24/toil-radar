@@ -1,6 +1,6 @@
 """Aggregate stored toil events into an actionable summary."""
 
-from collections import defaultdict
+from collections import Counter, defaultdict
 
 from . import store
 
@@ -68,7 +68,33 @@ def summarize(conn, days=30, repo=None):
         "trend_pct": trend_pct,
         "hotspots": store.file_hotspots(conn, days, repo),
         "candidates": _candidates(by_signal),
+        "breakage": _breakage_sources(conn, events),
     }
+
+
+def _breakage_sources(conn, events, top=5):
+    """Files touched by the commits that put the default branch red.
+
+    Each broken_main episode records the commit its first failing run was built
+    from, so this is the actual culprit rather than everything that happened to
+    land in the same window. Commits outside the scanned history just don't
+    contribute.
+    """
+    by_repo = defaultdict(set)
+    for e in events:
+        if e["signal"] != "broken_main":
+            continue
+        sha = (e.get("detail") or {}).get("broken_by")
+        if sha:
+            by_repo[e["repo"]].add(sha)
+
+    episodes = sum(len(shas) for shas in by_repo.values())
+    counts = Counter()
+    for repo, shas in by_repo.items():
+        for files in store.files_for_commits(conn, repo, shas).values():
+            for f in set(files):
+                counts[f] += 1
+    return {"episodes": episodes, "files": counts.most_common(top)}
 
 
 def _candidates(by_signal):
@@ -122,6 +148,14 @@ def render_text(summary):
         lines.append("Churn hotspots (same file touched in many commits):")
         for f, n in summary["hotspots"]:
             lines.append(f"  {f}  ({n} commits)")
+
+    breakage = summary.get("breakage") or {}
+    if breakage.get("files"):
+        total = breakage["episodes"]
+        lines.append("")
+        lines.append("What broke the default branch:")
+        for f, n in breakage["files"]:
+            lines.append(f"  {f}  ({n} of {total} episodes)")
 
     if summary["candidates"]:
         lines.append("")

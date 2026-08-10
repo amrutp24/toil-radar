@@ -8,7 +8,34 @@ from pathlib import Path
 from . import git_signals, github_signals, pagerduty_signals, report, store
 
 
-def scan_repo(repo_path, days=30, db_path=store.DEFAULT_DB, github=True):
+def scan_repos(repo_paths, days=30, db_path=store.DEFAULT_DB, github=True):
+    """Scan several repositories into one database.
+
+    A bad path doesn't abort the run - the rest are still scanned, and the exit
+    code reports whether anything failed. That way 'toil-radar scan ~/code/*'
+    does the useful thing even when the glob picks up a stray directory.
+    """
+    if isinstance(repo_paths, (str, Path)):
+        repo_paths = [repo_paths]
+    many = len(repo_paths) > 1
+
+    failed = 0
+    for i, path in enumerate(repo_paths):
+        if i:
+            print()
+        if scan_repo(path, days, db_path, github, show_hint=not many) != 0:
+            failed += 1
+
+    if many:
+        scanned = len(repo_paths) - failed
+        print(f"\n{scanned} of {len(repo_paths)} repositories scanned"
+              f"{f', {failed} failed' if failed else ''}.")
+        if scanned:
+            print(f"Run 'toil-radar summary --db {db_path}' for the full report.")
+    return 1 if failed else 0
+
+
+def scan_repo(repo_path, days=30, db_path=store.DEFAULT_DB, github=True, show_hint=True):
     repo = Path(repo_path)
     if not repo.exists():
         print(f"Error: repository path '{repo_path}' does not exist")
@@ -39,7 +66,7 @@ def scan_repo(repo_path, days=30, db_path=store.DEFAULT_DB, github=True):
 
     print(f"Commits scanned: {len(commits)}")
     print(f"Toil events: {len(events)} found, {new} new")
-    if events:
+    if events and show_hint:
         print(f"\nRun 'toil-radar summary --db {db_path}' for the full report.")
     return 0
 
@@ -88,6 +115,7 @@ def main():
 Examples:
   toil-radar scan /path/to/repo
   toil-radar scan . --days 60 --no-github
+  toil-radar scan ~/code/*
   toil-radar summary
   toil-radar summary --repo /path/to/repo --days 90
         """,
@@ -97,7 +125,10 @@ Examples:
     )
 
     scan_parser = subparsers.add_parser("scan", help="Scan a repository for toil signals")
-    scan_parser.add_argument("repo_path", help="Path to Git repository")
+    scan_parser.add_argument(
+        "repo_path", nargs="+", metavar="REPO",
+        help="Path to a Git repository (repeat, or glob, to scan several)",
+    )
     scan_parser.add_argument("--days", type=int, default=30, help="Days to look back (default: 30)")
     scan_parser.add_argument("--db", default=store.DEFAULT_DB, help=f"Database file (default: {store.DEFAULT_DB})")
     scan_parser.add_argument("--no-github", action="store_true", help="Skip GitHub Actions signals")
@@ -130,7 +161,7 @@ Examples:
 
     args = parser.parse_args()
     if args.command == "scan":
-        return scan_repo(args.repo_path, args.days, args.db, github=not args.no_github)
+        return scan_repos(args.repo_path, args.days, args.db, github=not args.no_github)
     elif args.command == "pages":
         return ingest_pages(args.days, args.db, path=args.file)
     elif args.command == "summary":
