@@ -2,6 +2,19 @@
 
 All notable changes to Toil Radar will be documented in this file.
 
+## [Unreleased]
+
+### Added
+- `toil-radar export` writes stored metrics in Prometheus text format, for
+  trending toil over months. `--output` writes atomically (write, then rename)
+  so the node_exporter textfile collector never scrapes a half-written file
+- CI validates the exported metrics with `promtool check metrics`, so the format
+  is checked by a real Prometheus parser rather than by eye
+
+### Fixed
+- README links are absolute, so they resolve on the PyPI project page as well as
+  on GitHub - PyPI does not rewrite relative markdown links
+
 ## [0.4.0] - 2026-08-10
 
 ### Added
