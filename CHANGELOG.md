@@ -2,7 +2,7 @@
 
 All notable changes to Toil Radar will be documented in this file.
 
-## [Unreleased]
+## [0.5.0] - 2026-09-04
 
 ### Added
 - `toil-radar export` writes stored metrics in Prometheus text format, for
