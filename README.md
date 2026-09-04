@@ -19,7 +19,7 @@ The git signals work offline. The three GitHub Actions signals use the `gh` CLI 
 
 Each episode also records the commit its first failing run was built from, so `summary` can name what actually broke the branch rather than everything that happened to land nearby. Commits older than the scanned history just don't contribute.
 
-Every other event gets a rough cost in minutes (weights are in [`toil_radar/git_signals.py`](toil_radar/git_signals.py), deliberately conservative). Anything that started on a night or weekend counts 1.5x. The total isn't meant to be payroll-accurate — it's a consistent number you can trend over time and use to decide what to automate first. Rescanning never double-counts: events are deduplicated by commit hash or run id.
+Every other event gets a rough cost in minutes (weights are in [`toil_radar/git_signals.py`](https://github.com/amrutp24/toil-radar/blob/main/toil_radar/git_signals.py), deliberately conservative). Anything that started on a night or weekend counts 1.5x. The total isn't meant to be payroll-accurate — it's a consistent number you can trend over time and use to decide what to automate first. Rescanning never double-counts: events are deduplicated by commit hash or run id.
 
 ## Install
 
@@ -104,4 +104,4 @@ pytest
 
 ## License
 
-MIT — see [LICENSE](LICENSE)
+MIT — see [LICENSE](https://github.com/amrutp24/toil-radar/blob/main/LICENSE)
