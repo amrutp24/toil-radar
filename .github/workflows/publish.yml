@@ -25,6 +25,24 @@ jobs:
     - name: Build package
       run: python -m build
 
+    - name: Check the built version matches the tag
+      # setuptools-scm derives the version from git tags, so a shallow clone or
+      # a missing tag silently produces a dev version instead of failing. This
+      # workflow only ever runs on a tag push and nothing else exercises it, so
+      # catch the mismatch here - a wrong version on PyPI cannot be taken back.
+      #
+      # Plain vX.Y.Z tags compare exactly. A pre-release tag like v1.0.0-rc1
+      # normalises to 1.0.0rc1 under PEP 440 and would fail this check; that is
+      # a false alarm, but it fails closed, which is the safe direction.
+      run: |
+        TAG="${GITHUB_REF_NAME#v}"
+        BUILT=$(ls dist/*.tar.gz | sed -E 's|.*/toil_radar-(.+)\.tar\.gz|\1|')
+        echo "tag=$TAG built=$BUILT"
+        if [ "$TAG" != "$BUILT" ]; then
+          echo "::error::built version '$BUILT' does not match tag '$TAG' - refusing to publish"
+          exit 1
+        fi
+
     - name: Publish to PyPI
       uses: pypa/gh-action-pypi-publish@release/v1
       with:
