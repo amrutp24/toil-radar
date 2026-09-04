@@ -3,6 +3,7 @@
 import io
 import json
 import os
+import shutil
 import sqlite3
 import subprocess
 import sys
@@ -17,9 +18,12 @@ from unittest.mock import patch
 import pytest
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
-from toil_radar import git_signals, github_signals, pagerduty_signals, report, store
+from toil_radar import (
+    git_signals, github_signals, pagerduty_signals, prometheus, report, store,
+)
 from toil_radar.cli import (
-    ingest_pages, main as cli_main, scan_repo, scan_repos, show_summary,
+    export_metrics, ingest_pages, main as cli_main, scan_repo, scan_repos,
+    show_summary,
 )
 
 
@@ -895,3 +899,93 @@ def test_stored_event_detail_round_trips_as_a_dict(db):
     conn.close()
     assert events["aaa"]["detail"] == {"file": "app.py", "gap_minutes": 25}
     assert events["bbb"]["detail"] == {}
+
+
+# --- prometheus export -------------------------------------------------------
+
+PROMTOOL = shutil.which("promtool") or os.environ.get("PROMTOOL")
+
+
+def _seeded_db(db, repo_key="/srv/app"):
+    conn = store.connect(db)
+    today = datetime.now().date().isoformat()
+    store.save_events(conn, repo_key, [
+        {"signal": "revert", "ref": "a", "date": today, "minutes": 45, "out_of_hours": True},
+        {"signal": "revert", "ref": "b", "date": today, "minutes": 45},
+        {"signal": "ci_rerun", "ref": "c", "date": today, "minutes": 20},
+    ])
+    return conn
+
+
+def test_export_groups_by_repo_and_signal(db):
+    conn = _seeded_db(db)
+    text = prometheus.render(conn, days=30)
+    conn.close()
+    assert 'toil_radar_events{repo="/srv/app",signal="revert"} 2' in text
+    assert 'toil_radar_events{repo="/srv/app",signal="ci_rerun"} 1' in text
+    # minutes are converted to seconds, the Prometheus base unit
+    assert 'toil_radar_seconds{repo="/srv/app",signal="revert"} 5400' in text
+    assert 'toil_radar_night_weekend_events{repo="/srv/app"} 1' in text
+    assert "toil_radar_window_seconds 2592000" in text
+
+
+def test_export_declares_help_and_type_for_every_metric(db):
+    conn = _seeded_db(db)
+    text = prometheus.render(conn, days=30)
+    conn.close()
+    named = {ln.split()[0] for ln in text.splitlines() if ln and not ln.startswith("#")}
+    for name in {n.split("{")[0] for n in named}:
+        assert f"# HELP {name} " in text
+        assert f"# TYPE {name} gauge" in text
+
+
+def test_export_escapes_windows_paths(db):
+    # label values must escape backslashes or the exposition format is invalid
+    windows_path = "C:\\Users\\dev\\repo"
+    conn = _seeded_db(db, repo_key=windows_path)
+    text = prometheus.render(conn, days=30)
+    conn.close()
+    assert 'repo="%s"' % windows_path.replace("\\", "\\\\") in text
+    assert 'repo="%s"' % windows_path not in text   # never the unescaped form
+
+
+def test_export_of_empty_database_is_still_valid(db):
+    conn = store.connect(db)
+    text = prometheus.render(conn, days=30)
+    conn.close()
+    # no events, but the window and ratio still describe the scrape
+    assert "toil_radar_events" not in text
+    assert "toil_radar_capacity_ratio 0" in text
+    assert text.endswith("\n")
+
+
+def test_export_writes_file_atomically(db, tmp_path):
+    conn = _seeded_db(db)
+    conn.close()
+    out = tmp_path / "toil.prom"
+    assert export_metrics(db_path=db, days=30, output=str(out)) == 0
+    assert out.read_text(encoding="utf-8").startswith("# HELP")
+    assert not (tmp_path / "toil.prom.tmp").exists()  # temp file renamed away
+
+
+def test_export_reports_unwritable_output(db, tmp_path, capsys):
+    conn = _seeded_db(db)
+    conn.close()
+    unwritable = tmp_path / "no-such-dir" / "toil.prom"
+    assert export_metrics(db_path=db, days=30, output=str(unwritable)) == 1
+    assert "could not write metrics" in capsys.readouterr().out
+
+
+@pytest.mark.skipif(not PROMTOOL, reason="promtool not installed")
+def test_export_passes_promtool_check_metrics(db, tmp_path):
+    """Authoritative format check: promtool lints the exposition output."""
+    conn = _seeded_db(db, repo_key=r"C:\Users\dev\repo")
+    text = prometheus.render(conn, days=30)
+    conn.close()
+    # bytes, not text: on Windows text mode would turn every \n into \r\n and
+    # promtool rejects CRLF in the exposition format
+    result = subprocess.run(
+        [PROMTOOL, "check", "metrics"], input=text.encode("utf-8"),
+        capture_output=True,
+    )
+    assert result.returncode == 0, (result.stdout + result.stderr).decode(errors="replace")
