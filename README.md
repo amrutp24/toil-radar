@@ -36,10 +36,25 @@ toil-radar scan . --days 60
 toil-radar scan ~/code/*             # several at once
 toil-radar summary
 toil-radar summary --repo /path/to/repo --days 90
+toil-radar export --output /var/lib/node_exporter/toil.prom
 toil-dashboard
 ```
 
 Scans accumulate in one database; `summary` aggregates across every repo you've scanned unless you filter with `--repo`. `scan` takes any number of paths, and a bad one doesn't abort the rest — anything in the list that isn't a git repo is reported and skipped, so globbing a directory of projects does the sensible thing. The exit code is non-zero if any path failed.
+
+## Prometheus
+
+`export` writes the stored metrics in Prometheus text format, for trending toil over months rather than eyeballing a single window. Point `--output` at the node_exporter textfile collector's directory and run it on a schedule; the file is written and renamed into place, so a scrape never catches it half-written.
+
+```
+toil_radar_events{repo="/srv/app",signal="broken_main"} 3
+toil_radar_seconds{repo="/srv/app",signal="broken_main"} 3084
+toil_radar_night_weekend_events{repo="/srv/app"} 9
+toil_radar_capacity_ratio 0.004
+toil_radar_window_seconds 15552000
+```
+
+Values are in seconds because that's the Prometheus convention, even though the CLI talks in minutes and hours. CI runs `promtool check metrics` over the output on every push, so the format is verified by a real Prometheus parser rather than by eye.
 
 ## Example
 
@@ -97,10 +112,8 @@ pytest
 
 ## Roadmap
 
-- incident ingestion (PagerDuty, Opsgenie) — repeated alerts are the strongest toil signal there is
 - deploy→fix→deploy loop detection
 - per-team and per-author views
-- Prometheus metrics export for long-term trending
 
 ## License
 
