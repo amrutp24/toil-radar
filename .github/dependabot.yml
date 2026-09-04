@@ -1,0 +1,25 @@
+version: 2
+
+# Security updates are enabled in the repo settings and fire on advisories.
+# This file covers routine version updates, grouped so a quiet week produces
+# one PR rather than five.
+updates:
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
+    groups:
+      actions:
+        patterns: ["*"]
+
+  # The core package has no runtime dependencies; this tracks the [dashboard]
+  # and [dev] extras declared in pyproject.toml.
+  - package-ecosystem: "pip"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
+    groups:
+      python-packages:
+        patterns: ["*"]
