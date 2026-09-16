@@ -2,6 +2,10 @@
 
 Estimates how much time a team loses to toil — reverts, hotfixes, flaky CI, manual button-pushing — from signals already sitting in git history and GitHub Actions. Point it at a repo and get back estimated hours, a trend, and a ranked list of what to automate first.
 
+![The toil-radar dashboard: estimated toil, trend vs prior period, out-of-hours events, toil hours per day, toil hours by signal, and the top automation candidates](docs/dashboard.png)
+
+*The optional dashboard, scanning seven repositories over 90 days. The CLI reports the same numbers as text.*
+
 The SRE handbook says to keep toil under 50% of engineering time. Almost nobody measures it, and grepping commit messages for "fix" doesn't work — it flags half of normal development. So toil-radar only counts events that don't happen unless someone was cleaning up a mess:
 
 | signal | what happened |
