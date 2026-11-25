@@ -296,6 +296,79 @@ def test_github_missing_gh_degrades_gracefully():
     assert "gh" in reason
 
 
+# --- out-of-hours uses the triggering commit's timezone -----------------------
+
+def _commit_at(sha, authored_at):
+    return git_signals.Commit(
+        hash=sha, parents=[], author="dev", authored_at=authored_at, subject="work",
+    )
+
+
+# 02:00 UTC on a Wednesday: 07:30 in +05:30 (working hours), but late evening
+# or small hours everywhere west of it. Picks out the timezone actually used.
+_AMBIGUOUS_UTC = "2026-07-08T02:00:00Z"
+
+
+def _run_at_ambiguous_hour(sha="deadbeef", conclusion="failure", name="CI"):
+    return {"id": 1, "name": name, "event": "push", "run_attempt": 2,
+            "conclusion": conclusion, "created_at": _AMBIGUOUS_UTC,
+            "head_branch": "main", "head_sha": sha}
+
+
+def test_out_of_hours_uses_the_authors_timezone_not_the_scanners():
+    runs = [_run_at_ambiguous_hour()]
+    offsets = github_signals.offsets_by_sha([
+        _commit_at("deadbeef", "2026-07-08T07:30:00+05:30"),
+    ])
+    started = github_signals._local_time(runs[0], offsets)
+    assert started.strftime("%H:%M") == "07:30"
+    assert git_signals.is_out_of_hours(started) is False
+
+
+def test_out_of_hours_falls_back_to_local_time_for_unknown_commits():
+    run = _run_at_ambiguous_hour(sha="not-in-history")
+    offsets = github_signals.offsets_by_sha([_commit_at("other", "2026-07-08T07:30:00+05:30")])
+    started = github_signals._local_time(run, offsets)
+    # whatever this machine says - asserted against the same rule, so it holds
+    # on a UTC runner and on a developer's laptop alike
+    assert started == github_signals._parse_dt(_AMBIGUOUS_UTC).astimezone()
+
+
+def test_broken_main_scored_in_the_breaking_authors_timezone():
+    runs = [
+        _run_at_ambiguous_hour(sha="abc123"),
+        {"id": 2, "name": "CI", "event": "push", "run_attempt": 1,
+         "conclusion": "success", "created_at": "2026-07-08T02:20:00Z",
+         "head_branch": "main", "head_sha": "def456"},
+    ]
+    offsets = github_signals.offsets_by_sha([
+        _commit_at("abc123", "2026-07-08T07:30:00+05:30"),
+    ])
+    event = github_signals.detect_broken_main(runs, "main", offsets)[0]
+    assert event["out_of_hours"] is False          # 07:30 for the author
+    assert event["date"] == "2026-07-08"           # their calendar day, not UTC's
+    assert event["minutes"] == 20                  # unamplified
+
+
+def test_offsets_by_sha_tolerates_unusable_commits():
+    assert github_signals.offsets_by_sha(None) == {}
+    assert github_signals.offsets_by_sha([]) == {}
+    offsets = github_signals.offsets_by_sha([_commit_at("bad", "not-a-timestamp")])
+    assert offsets == {}
+
+
+def test_scan_threads_commits_through_to_the_events():
+    runs = [json.dumps(_run_at_ambiguous_hour(sha="abc123", conclusion="success"))]
+    commits = [_commit_at("abc123", "2026-07-08T07:30:00+05:30")]
+    with patch("toil_radar.github_signals.subprocess.run",
+               side_effect=[_gh_result(runs), _gh_result(["main"])]):
+        events, reason = github_signals.scan(".", days_back=30, commits=commits)
+    assert reason is None
+    rerun = next(e for e in events if e["signal"] == "ci_rerun")
+    assert rerun["out_of_hours"] is False
+    assert rerun["date"] == "2026-07-08"
+
+
 # --- broken default branch ---------------------------------------------------
 
 def test_broken_main_groups_consecutive_failures_into_one_episode():

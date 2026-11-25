@@ -34,6 +34,33 @@ def _parse_dt(value):
     return datetime.fromisoformat(value.replace("Z", "+00:00"))
 
 
+def offsets_by_sha(commits):
+    """Map commit hash -> the author's UTC offset.
+
+    Git records the timezone each commit was authored in; the Actions API does
+    not. Pairing a run with the commit it was built from is what lets a 3am
+    page be judged as 3am for the person it woke, not for whoever ran the scan.
+    """
+    offsets = {}
+    for c in commits or []:
+        try:
+            offsets[c.hash] = c.authored_dt.tzinfo
+        except (AttributeError, ValueError):
+            continue
+    return offsets
+
+
+def _local_time(run, offsets):
+    """A run's start time in the timezone of whoever triggered it.
+
+    Falls back to the scanning machine's timezone when the triggering commit
+    isn't in the scanned history - an approximation, but the only one available.
+    """
+    started = _parse_dt(run["created_at"])
+    tz = offsets.get(run.get("head_sha")) if offsets else None
+    return started.astimezone(tz) if tz else started.astimezone()
+
+
 def _default_branch(repo_path):
     """The repo's default branch, or None if `gh` can't tell us."""
     try:
@@ -49,7 +76,7 @@ def _default_branch(repo_path):
     return result.stdout.strip() or None
 
 
-def detect_broken_main(runs, default_branch):
+def detect_broken_main(runs, default_branch, offsets=None):
     """Collapse consecutive failed default-branch runs into red-main episodes.
 
     An episode opens on the first failure and closes on the next success of the
@@ -78,18 +105,20 @@ def detect_broken_main(runs, default_branch):
             if run["conclusion"] == "failure":
                 episode.append(run)
             elif episode:
-                events.append(_broken_main_event(name, default_branch, episode, run))
+                events.append(
+                    _broken_main_event(name, default_branch, episode, run, offsets)
+                )
                 episode = []
     return events
 
 
-def _broken_main_event(name, branch, episode, recovery):
+def _broken_main_event(name, branch, episode, recovery, offsets=None):
     first = episode[0]
     started = _parse_dt(first["created_at"])
     red_minutes = (_parse_dt(recovery["created_at"]) - started).total_seconds() / 60
     minutes = max(BROKEN_MAIN_MIN_MINUTES, min(BROKEN_MAIN_MAX_MINUTES, red_minutes))
 
-    local = started.astimezone()
+    local = _local_time(first, offsets)
     ooh = is_out_of_hours(local)
     if ooh:
         minutes *= OUT_OF_HOURS_MULTIPLIER
@@ -119,9 +148,14 @@ def _broken_main_event(name, branch, episode, recovery):
     }
 
 
-def scan(repo_path, days_back=30):
-    """Return (events, skip_reason). skip_reason is None on success."""
+def scan(repo_path, days_back=30, commits=None):
+    """Return (events, skip_reason). skip_reason is None on success.
+
+    Pass the repo's commits to score out-of-hours work in the timezone of the
+    person who triggered each run rather than the scanning machine's.
+    """
     repo_path = Path(repo_path).resolve()
+    offsets = offsets_by_sha(commits)
     since = (datetime.now(timezone.utc) - timedelta(days=days_back)).strftime("%Y-%m-%d")
     try:
         result = subprocess.run(
@@ -152,7 +186,7 @@ def scan(repo_path, days_back=30):
         runs.append(run)
         # Local time, like every other signal: a 3am re-run is someone's night,
         # and the UTC calendar date can land on the wrong day either way.
-        started = _parse_dt(run["created_at"]).astimezone()
+        started = _local_time(run, offsets)
         date = started.date().isoformat()
         ooh = is_out_of_hours(started)
         amplifier = OUT_OF_HOURS_MULTIPLIER if ooh else 1
@@ -181,5 +215,5 @@ def scan(repo_path, days_back=30):
             })
 
     # A repo with no default branch we can resolve still gets the other signals.
-    events += detect_broken_main(runs, _default_branch(repo_path))
+    events += detect_broken_main(runs, _default_branch(repo_path), offsets)
     return events, None

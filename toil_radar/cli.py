@@ -53,7 +53,7 @@ def scan_repo(repo_path, days=30, db_path=store.DEFAULT_DB, github=True, show_hi
         return 1
 
     if github:
-        gh_events, skip_reason = github_signals.scan(repo_key, days)
+        gh_events, skip_reason = github_signals.scan(repo_key, days, commits=commits)
         if skip_reason:
             print(f"GitHub Actions signals skipped: {skip_reason}")
         else:

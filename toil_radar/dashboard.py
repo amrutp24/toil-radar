@@ -48,7 +48,7 @@ def run():
             try:
                 commits, events = git_signals.scan(scan_path, days)
                 if use_github:
-                    gh_events, skip = github_signals.scan(scan_path, days)
+                    gh_events, skip = github_signals.scan(scan_path, days, commits=commits)
                     if skip:
                         st.sidebar.info(f"GitHub signals skipped: {skip}")
                     else:
